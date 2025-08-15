@@ -278,7 +278,7 @@ df_intervention <- df %>%
 range(df$arsenic)
 range(df_intervention$arsenic)
 
-# 6.	What's a technical issue with the proportional reduction approach in which exposures for all individuals are reduced by a constant proportion (Hints: think in terms of causal or modeling assumptions, and consider the post-intervention exposures for the participant with the lowest exposures)?
+# QUESTION:	What's a technical issue with the proportional reduction approach in which exposures for all individuals are reduced by a constant proportion (Hints: think in terms of causal or modeling assumptions, and consider the post-intervention exposures for the participant with the lowest exposures)?
 
 
 # Solution to the technical issue: a "bounded" reduction that respects the observed bounds of the exposure distribution
@@ -292,7 +292,7 @@ percent_reduction_bounded <- function(x, prop) {
 ## example: reduction of values does not go below minimum observed
 percent_reduction_bounded(c(25, 30, 60, 75), .50)
 
-# Application: 50% BOUNDED proportioanal reduction intervention for all exposures
+# Application: 50% BOUNDED proportional reduction intervention for all exposures
 myintervention <- 0.50
 df_intervention <- df %>%
   mutate(
