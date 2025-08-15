@@ -23,12 +23,12 @@ new_packages <- list_of_packages[!(list_of_packages %in% installed.packages()[, 
 if (length(new_packages)) install.packages(new_packages, repos = "https://mirrors.nics.utk.edu/cran")
 # Note to attendee: You will need to download workshop folder and then you may need to input your own directory
 # this can be used to automatically set the path to the root directory
-mydirectory <- normalizePath(here::here()) 
+mydirectory <- normalizePath(here::here())
 # mydirectory <- "C:/Users/spaurms/OneDrive - National Institutes of Health/Presentations/ISEE 2025/Workshop/isee_2025_organizers/ISEE2025_Workshop"
 ```
 
 ```{r, include=FALSE}
-knitr::opts_chunk$set(tidy.opts = list(width.cutoff = I(80), wrap=TRUE), tidy = "formatR", comment = "#>", arrow = TRUE)
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = I(80), wrap = TRUE), tidy = "formatR", comment = "#>", arrow = TRUE)
 ```
 
 
@@ -92,13 +92,13 @@ exposures <- c(
 ## note the different concentration ranges between exposures
 for (i in 1:length(exposures)) {
   print(exposures[i])
-  print(summary(df[[exposures[i]]])) 
+  print(summary(df[[exposures[i]]]))
 }
 
 
 ## Comparisons with and without log-transformations
 ### empty list to store plots
-distplots <- list() 
+distplots <- list()
 for (i in 1:length(exposures)) {
   p1 <- ggplot(df, aes(x = get(exposures[i]))) +
     geom_density() +
@@ -126,11 +126,11 @@ mycor_fun <- function(d) {
   round(cor(d, use = "pairwise.complete.obs", method = "spearman"), 2)
 }
 ## set correlation color scale from -1 to 1 with 100 breakpoints
-mybreaks <- seq(from = -1, to = 1, length.out = 100) 
+mybreaks <- seq(from = -1, to = 1, length.out = 100)
 ## set colorscale; red = high & blue = low
-myheatcolor <- colorRampPalette(c("#2b8cbe", "#f5f5f5", "#de2d26"))(n = 100) 
+myheatcolor <- colorRampPalette(c("#2b8cbe", "#f5f5f5", "#de2d26"))(n = 100)
 ## correlation value we deem minimally important (arbitrary value)
-threshold_value <- 0.25 
+threshold_value <- 0.25
 
 ## Create correlation matrix
 df.cor <- mycor_fun(df[, exposures])
@@ -140,7 +140,7 @@ mydisplay_numbers <- df.cor
 mydisplay_numbers[lower.tri(mydisplay_numbers)] <- ifelse(
   abs(mydisplay_numbers[lower.tri(mydisplay_numbers)]) > threshold_value &
     abs(mydisplay_numbers[lower.tri(mydisplay_numbers)]) < 1.0, "*", ""
-) 
+)
 ## asterix for correlations above threshold
 
 # Plot without clustering
@@ -173,7 +173,6 @@ pheatmap::pheatmap(df.cor,
 
 
 ## Question: 4.	Modify the code to examine which group is exposed to higher mean levels of arsenic, selenium, barium, uranium, chromium across levels of `rural_urban_code`. Which group is most highly exposed to each? Do you feel that, overall, exposure to the mixture of these contaminants is equitable across levels of rural_urban?
-
 ```
 
 # G-computation (parametric g-formula) to estimate effects of hypothetical interventions on a mixture of time-fixed, continuous exposures on a continuous outcome
@@ -225,7 +224,7 @@ df_intervention$pred_biomarker <- predict(mod_biomarker, newdata = df_interventi
 
 # Prediction using OBSERVED exposures
 ## copy of OBSERVED (measured) data
-df_observed <- df 
+df_observed <- df
 df_observed$obs_biomarker <- predict(mod_biomarker, newdata = df_observed)
 df_intervention <- left_join(df_intervention, select(df_observed, participant_id, obs_biomarker), by = join_by(participant_id))
 
@@ -260,12 +259,12 @@ df_intervention %>%
 ## Purpose of function: reduce participant exposures by (prop*100)%
 percent_reduction <- function(x, prop) {
   x * (1 - prop)
-} 
+}
 ## example usage: 75% reduction of 100
 percent_reduction(x = 100, prop = .75)
 
 # Application: 50% proportioanal reduction intervention for all exposures
-myintervention <- 0.50 
+myintervention <- 0.50
 df_intervention <- df %>%
   mutate(
     arsenic = percent_reduction(arsenic, myintervention),
@@ -348,12 +347,12 @@ regulatory_reduction(c(25, 60, 75), standard = 30)
 df_intervention <- df %>%
   # All exposures are based on ug/L concentration in drinking water (same as intervention values below)
   mutate(
-    arsenic = regulatory_reduction(arsenic, 10),   # arsenic MCL = 10 ug/L
+    arsenic = regulatory_reduction(arsenic, 10), # arsenic MCL = 10 ug/L
     selenium = regulatory_reduction(selenium, 50), # selenium MCL = 50 ug/L
-    barium = regulatory_reduction(barium, 2000),   # barium MCL = 2000 ug/L
-    uranium = regulatory_reduction(uranium, 30),   # uranium MCL = 30 ug/L
+    barium = regulatory_reduction(barium, 2000), # barium MCL = 2000 ug/L
+    uranium = regulatory_reduction(uranium, 30), # uranium MCL = 30 ug/L
     chromium = regulatory_reduction(chromium, 100) # chromium = 100 ug/L
-  ) 
+  )
 
 ## Perform new prediction based on intervention
 df_intervention$pred_biomarker <- predict(mod_biomarker, newdata = df_intervention)
@@ -401,7 +400,7 @@ df %>%
 # geometric mean - exponentiated mean of log-transformed distribution
 geom_mean <- function(x) {
   exp(mean(log(x)))
-} 
+}
 df %>%
   group_by(rural_urban_code) %>%
   summarise(
@@ -574,7 +573,7 @@ df_intervention %>%
 
 # In R, we can implement bootstrapping by wrapping all of the steps of getting an estimate into a function, and then running that function over repeated bootstrap samples of the population
 
-# Implementation of the bootstrap for g-computation (bounded percent reduction, same scenario as Example 3): 
+# Implementation of the bootstrap for g-computation (bounded percent reduction, same scenario as Example 3):
 
 ## Create function to fit model (same model as used in example above, but allows model to be fit to bootstrap sample of participants [data = bootdf])
 gcomp_fit_model <- function(bootdf) {
@@ -627,14 +626,14 @@ qgcomp_get_effectmeasures <- function(bootdf_intervention) {
     select(abs_change, pct_change)
 }
 
-## We so we need a function to draw a bootstrap sample and create a new id 
+## We so we need a function to draw a bootstrap sample and create a new id
 ## Note: a bootstrap sample is a sample with the same number of units as the original dataset, using sampling with replacement. Thus, some individuals will be represented by multiple "copies" within a bootstrap sample, so they need new ids to distinguish the copies from one another (the id is used for merging datasets, in this case)
 qgcomp_draw_bootsample <- function(df, no_resample = FALSE) {
   ## technical note: in repeated measures data, or data with correlation across observations, bootstrapping will be done differently!
   if (no_resample) {
     ## allow the sample to return the original dataset if no_resample = TRUE (comes in handy as a programming trick later)
     df$bootparticipant_id <- 1:nrow(df)
-    return(df) 
+    return(df)
   }
   bootsample_keep <- sample(1:nrow(df), replace = TRUE)
   bootdf <- df[bootsample_keep, ]
@@ -646,7 +645,7 @@ qgcomp_draw_bootsample <- function(df, no_resample = FALSE) {
 ## Finally, we need a function to do all steps at once. This function can be run repeatedly to generate a set of many bootstrap samples. The bootstrap samples then form the "sampling distribution" of the measures/effect estimates from which we can calculate confidence intervals
 qgcomp_do_allsteps <- function(df, iter, no_resample = FALSE) {
   ### 1) draw bootstrap sample
-  bootdf <- qgcomp_draw_bootsample(df, no_resample = no_resample) 
+  bootdf <- qgcomp_draw_bootsample(df, no_resample = no_resample)
   ### 2) fit model to bootstrap sample
   bootmodel <- gcomp_fit_model(bootdf)
   ### 3) create intervention dataset using the bootstrap dataset
@@ -671,14 +670,13 @@ set.seed(1232)
 ## Note: this can take a while on a slow computer or large dataset
 bootsamples <- lapply(1:1000, function(i) {
   qgcomp_do_allsteps(df, iter = i)
-  }
-  )
+})
 ## then we can convert that list to a data.frame for processing
 bootsamples.df <- do.call(rbind, bootsamples)[, c("abs_change", "pct_change")]
 ## bootstrap standard errors are given as the standard deviations of the bootstrap iterations. We can use 1.96*bootstrap standard error to get 95% confidence intervals (so-called "Wald" style confidence intervals)
 bootse <- apply(bootsamples.df, 2, sd)
 ## The "point estimate" is always based on the original data and not a bootstrap sample
-pointest <- qgcomp_do_allsteps(df, 0, no_resample = TRUE)[, c("abs_change", "pct_change")] 
+pointest <- qgcomp_do_allsteps(df, 0, no_resample = TRUE)[, c("abs_change", "pct_change")]
 # NOTE: double check this versus the answer above using the bounded proportional reduction (they should be the same)
 boot_ci_wald <- as.data.frame(rbind(
   "Est" = pointest,
@@ -692,7 +690,7 @@ boot_ci_wald %>%
 # OR we can use percentiles of the bootstrap distribution to get 95% confidence intervals
 boot_ci_pctl <- as.data.frame(apply(bootsamples.df, 2, function(x) quantile(x, c(0.025, 0.975))))
 
-rbind(as.data.frame(pointest, row.names=c("Est")), boot_ci_pctl)  %>%
+rbind(as.data.frame(pointest, row.names = c("Est")), boot_ci_pctl) %>%
   as.data.frame()
 
 
@@ -714,8 +712,8 @@ ggplot() +
 
 # Questions: Examine the point estimates in the `pointest` object
 # a) Which estimates (i.e. intervention and effect measure) are we getting estimates for in this step?
-# b) How could you interpret the effect measures (point estimates only) in a in terms of associations? 
-# c) How could you interpret the effect measures (point estimates only) in a in terms of causal effects (if all causal assumptions hold)? 
+# b) How could you interpret the effect measures (point estimates only) in a in terms of associations?
+# c) How could you interpret the effect measures (point estimates only) in a in terms of causal effects (if all causal assumptions hold)?
 
 # Question: Examine the histogram of the bootstrap sample for the "pct_change" effect estimate, as well as the two sets of confidence intervals.
 # a) Does this example show the intervention may have a statistically significant impact on our biomarker outcome?
@@ -724,13 +722,11 @@ ggplot() +
 # d) Which set of confidence intervals would you report?
 # e) Do you think your answer to a would change if the hypothetical intervention reduced the exposures by 1%? Why or why not?
 
-# 3) Question: Which part(s) of this section of code would we change to get bootstrap estimates for the "regulation" intervention (describe only)
+# Question: Which part(s) of this section of code would we change to get bootstrap estimates for the "regulation" intervention (describe only)
 
-# 4) BONUS Question: Modify the code (copy/paste below) to get 90% bootstrap confidence intervals (percentile based). What are they?
+# BONUS Question: Modify the code (copy/paste below) to get 90% bootstrap confidence intervals (percentile based). What are they?
 
-# 5) BONUS Question: Modify the code (copy/paste below) to get point estimates and 95% bootstrap confidence intervals for the "regulation" intervention (use the same seed value)? What are they?
+# BONUS Question: Modify the code (copy/paste below) to get point estimates and 95% bootstrap confidence intervals for the "regulation" intervention (use the same seed value)? What are they?
 
-# 6) BONUS Question: Modify the code (copy/paste below) to get point estimates and 95% bootstrap confidence intervals for the "regulation" intervention (use the same seed value). What are they?
-
-# 7) BONUS Question: Modify the code (copy/paste below) to get point estimates and 95% bootstrap confidence intervals for the "regulation" intervention for the binary outcome "cancer" in the data (use the same seed value and a logistic model that has the same terms as the linear model used above)
+# BONUS Question: Modify the code (copy/paste below) to get point estimates and 95% bootstrap confidence intervals for the "regulation" intervention for the binary outcome "cancer" in the data (use the same seed value and a logistic model that has the same terms as the linear model used above)
 ```
