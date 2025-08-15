@@ -1,0 +1,736 @@
+---
+title: "ISEE 2025 Drinking Water - Applied Example of Hypothetical Interventions"
+knit: (function(inputFile, encoding) { 
+      out_dir <- '../output';
+      rmarkdown::render(inputFile,
+                        encoding=encoding,
+                        output_format="all", 
+                        output_file=file.path(dirname(inputFile), out_dir, 'Drinking-Water - Applied-output')) })
+output:
+  html_document:
+    number_sections: yes
+    toc: yes
+date: "`r Sys.Date()`"
+---
+
+# Prelims
+
+
+```{r set path name, echo=FALSE, message=FALSE, warning=FALSE}
+# Installation of packages if needed
+list_of_packages <- c("dplyr", "tidyr", "ggplot2", "cowplot", "pheatmap", "jtools", "ggpubr", "tibble", "boot", "here", "rmarkdown", "knitr", "formatR")
+new_packages <- list_of_packages[!(list_of_packages %in% installed.packages()[, "Package"])]
+if (length(new_packages)) install.packages(new_packages, repos = "https://mirrors.nics.utk.edu/cran")
+# Note to attendee: You will need to download workshop folder and then you may need to input your own directory
+# this can be used to automatically set the path to the root directory
+mydirectory <- normalizePath(here::here()) 
+# mydirectory <- "C:/Users/spaurms/OneDrive - National Institutes of Health/Presentations/ISEE 2025/Workshop/isee_2025_organizers/ISEE2025_Workshop"
+```
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = I(80), wrap=TRUE), tidy = "formatR", comment = "#>", arrow = TRUE)
+```
+
+
+## Directory prep
+
+```{r create folders and directories, tidy=TRUE, tidy.opts=list(width.cutoff=80)}
+# Note to attendee: if you encounter errors you must uncomment the next line and input your own information in place of "~..."
+# mydirectory <- "~.../ISEE2025_Mixtures_Workshop" # Replace "~..."
+# Directory names
+wd.data <- file.path(mydirectory, "data")
+wd.output <- file.path(mydirectory, "output")
+```
+
+```{r check mydirectory, echo=FALSE}
+if (!(basename(mydirectory) %in% c("ISEE2025_Workshop", "ISEE2025_Mixtures_Workshop"))) {
+  stop("Please set `mydirectory` to the local path on your computer containing workshop files (around line 14 of this file)")
+}
+```
+
+
+```{r load packages, warning=FALSE}
+library(dplyr, warn.conflicts = FALSE)
+library(tidyr)
+library(ggplot2)
+library(cowplot)
+library(pheatmap)
+library(jtools)
+library(ggpubr, warn.conflicts = FALSE)
+library(tibble)
+library(boot)
+```
+
+```{r load working data}
+# Set data directory
+setwd(wd.data)
+df <- readRDS("Drinking Water data.RDS")
+
+# Description of data
+## Data was cleaned in prior file. It is a combination of EPA drinking contaminant levels and US cancer census data.
+## EPA Data source: https://msph.shinyapps.io/drinking-water-dashboard/ Ravalli et al. 2022 (DOI: 10.1016/S2542-5196(22)00043-2)
+## Cancer Census Data source: https://statecancerprofiles.cancer.gov/map/map.withimage.php?00&county&001&03010&00&0&3&0&1&5&0#results
+
+# Vector of exposure names
+exposures <- c(
+  "arsenic",
+  "barium",
+  "beryllium",
+  "cadmium",
+  "chromium",
+  "mercury",
+  "selenium",
+  "uranium"
+)
+# Note to attendees: exposures represent weighted average of EPA-measured drinking water contaminants from 2006-2011 (except for uranium, which was 2000-2011)
+```
+
+# Exploratory data analysis 
+## Univariate exposure distributions
+```{r descriptive statistics}
+# Exposure distributions
+## note the different concentration ranges between exposures
+for (i in 1:length(exposures)) {
+  print(exposures[i])
+  print(summary(df[[exposures[i]]])) 
+}
+
+
+## Comparisons with and without log-transformations
+### empty list to store plots
+distplots <- list() 
+for (i in 1:length(exposures)) {
+  p1 <- ggplot(df, aes(x = get(exposures[i]))) +
+    geom_density() +
+    theme_bw() +
+    xlab(exposures[i])
+  p2 <- ggplot(df, aes(x = log(get(exposures[i])))) +
+    geom_density() +
+    theme_bw() +
+    xlab(paste0("log ", exposures[i]))
+  distplots[[i]] <- cowplot::plot_grid(p1, p2, ncol = 2)
+}
+names(distplots) <- exposures
+
+# note right-skewness (distribution will impact effects of certain hypothetical interventions)
+distplots$arsenic
+# distplots$barium
+# distplots$uranium
+```
+
+## Exposure correlations
+```{r correlations}
+# Create a correlation heatmap
+## Create a function to output a well-formatted rank correlation matrix
+mycor_fun <- function(d) {
+  round(cor(d, use = "pairwise.complete.obs", method = "spearman"), 2)
+}
+## set correlation color scale from -1 to 1 with 100 breakpoints
+mybreaks <- seq(from = -1, to = 1, length.out = 100) 
+## set colorscale; red = high & blue = low
+myheatcolor <- colorRampPalette(c("#2b8cbe", "#f5f5f5", "#de2d26"))(n = 100) 
+## correlation value we deem minimally important (arbitrary value)
+threshold_value <- 0.25 
+
+## Create correlation matrix
+df.cor <- mycor_fun(df[, exposures])
+dimnames(df.cor) <- list(exposures, exposures)
+## Extract correlation values for plot
+mydisplay_numbers <- df.cor
+mydisplay_numbers[lower.tri(mydisplay_numbers)] <- ifelse(
+  abs(mydisplay_numbers[lower.tri(mydisplay_numbers)]) > threshold_value &
+    abs(mydisplay_numbers[lower.tri(mydisplay_numbers)]) < 1.0, "*", ""
+) 
+## asterix for correlations above threshold
+
+# Plot without clustering
+pheatmap::pheatmap(df.cor,
+  ## legend
+  annotation_legend = FALSE, legend = TRUE, legend_breaks = c(1, 0.5, 0, -0.5, -1),
+  ## colors
+  angle_col = 270, breaks = mybreaks, col = myheatcolor,
+  ## text labels
+  cex = 1.25, fontsize = 7, fontsize_number = 7,
+  display_numbers = mydisplay_numbers, number_color = "black",
+  # Hierarchical clustering
+  cluster_rows = FALSE, cluster_cols = FALSE
+)
+
+# Plot with hierarchical clustering included
+pheatmap::pheatmap(df.cor,
+  ## legend
+  annotation_legend = FALSE, legend = TRUE, legend_breaks = c(1, 0.5, 0, -0.5, -1),
+  ## colors
+  angle_col = 270, breaks = mybreaks, col = myheatcolor,
+  ## text labels
+  cex = 1.25, fontsize = 7, fontsize_number = 7,
+  display_numbers = mydisplay_numbers, number_color = "black",
+  ## Hierarchical clustering
+  cluster_rows = TRUE, cluster_cols = TRUE
+)
+
+## Question: What are any take-away observations you have from the correlation plots? How could these correlations influence your approach to a) specifying an exposure mixture (i.e. distinguish between "exposures that are measured together" and "mixture") and b) examining the joint effects of changes in the exposure mixture on outcomes?
+
+
+## Question: 4.	Modify the code to examine which group is exposed to higher mean levels of arsenic, selenium, barium, uranium, chromium across levels of `rural_urban_code`. Which group is most highly exposed to each? Do you feel that, overall, exposure to the mixture of these contaminants is equitable across levels of rural_urban?
+
+```
+
+# G-computation (parametric g-formula) to estimate effects of hypothetical interventions on a mixture of time-fixed, continuous exposures on a continuous outcome
+
+## Modeling: Specifying a model for Biomarker (continuous outcome)
+```{r example - base linear model for biomarker}
+# Description: Our initial model will evaluate our initial hypothesized relationship between exposures and our continuous biomarker outcome. We will fit a model for an additive relationship among a subset of exposures based on the clusters identified in our correlation heatmap. this is a relatively simplistic approach that does not necessarily address underlying causality.
+
+## Exposures to evaluate: arsenic, selenium, barium, uranium, chromium
+
+## Exposures to drop (for now): mercury, beryllium, and cadmium
+
+## confounders: rural_urban_code, value_index (note we cannot include state here because of limited sample size across covariates)
+
+### continuous
+summary(df$value_index)
+
+### categorical or "factor" variable
+table(df$rural_urban_code)
+
+# Modeling: Biomarker model (continuous outcome - here we use a linear model with log-transformed exposures)
+mod_biomarker <- glm(biomarker ~ log(arsenic) + log(selenium) + log(barium) + log(uranium) + log(chromium) + value_index * rural_urban_code, data = df)
+
+## Basic model summary & coefficients
+summary(mod_biomarker)
+
+## visualize model for a few predictors
+jtools::effect_plot(mod_biomarker, pred = arsenic, data = df, interval = TRUE, rug = F)
+## You can update code to evaluate other model predictors
+
+## jtools::effect_plot(mod_biomarker, pred = selenium, data = df, interval = TRUE, rug = F)
+
+## jtools::effect_plot(mod_biomarker, pred = uranium, data = df, interval = TRUE, rug = F)
+```
+
+## Effect estimation: simulation/prediction from parametric models
+### Example 1: Hypothetical intervention example: Setting all exposures to the observed median
+```{r EXAMPLE 1 - setting exposures to median}
+# Prediction using modified exposures - MEDIAN exposure values
+df_intervention <- df %>%
+  mutate(
+    arsenic = median(arsenic),
+    selenium = median(selenium),
+    barium = median(barium),
+    uranium = median(uranium),
+    chromium = median(chromium)
+  )
+df_intervention$pred_biomarker <- predict(mod_biomarker, newdata = df_intervention)
+
+# Prediction using OBSERVED exposures
+## copy of OBSERVED (measured) data
+df_observed <- df 
+df_observed$obs_biomarker <- predict(mod_biomarker, newdata = df_observed)
+df_intervention <- left_join(df_intervention, select(df_observed, participant_id, obs_biomarker), by = join_by(participant_id))
+
+## Comparison: observed vs predicted biomarker - Overall
+df_intervention %>%
+  summarise(
+    observed = mean(obs_biomarker),
+    predicted = mean(pred_biomarker),
+    ## calculate estimated percent change in biomarker
+    pct_change = ((predicted - observed) / observed) * 100
+  ) %>%
+  round(2)
+
+## Comparison: observed vs predicted biomarker - Stratified by rurality
+df_intervention %>%
+  group_by(rural_urban_code) %>%
+  summarise(
+    observed = mean(obs_biomarker),
+    predicted = mean(pred_biomarker),
+    pct_change = ((predicted - observed) / observed) * 100
+  ) %>%
+  as.data.frame()
+
+# Question: 4.	How do the observed values of `biomarker` (the outcome) compare to the predicted values under this hypothetical intervention, in which we set the exposures to their median values? Are there any potential conceptual issues with a hypothetical intervention to set exposures to the median values across all observed data?
+```
+
+###  Example 2: Hypothetical intervention example: Proportional reduction of all exposures
+```{r EXAMPLE 2 - proportional reduction}
+# Goal: expand on prior scenario, but apply intervention that proportionally reduces exposures (e.g., 10%, 20%, etc).
+
+# Simple percent reduction function
+## Purpose of function: reduce participant exposures by (prop*100)%
+percent_reduction <- function(x, prop) {
+  x * (1 - prop)
+} 
+## example usage: 75% reduction of 100
+percent_reduction(x = 100, prop = .75)
+
+# Application: 50% proportioanal reduction intervention for all exposures
+myintervention <- 0.50 
+df_intervention <- df %>%
+  mutate(
+    arsenic = percent_reduction(arsenic, myintervention),
+    selenium = percent_reduction(selenium, myintervention),
+    barium = percent_reduction(barium, myintervention),
+    uranium = percent_reduction(uranium, myintervention),
+    chromium = percent_reduction(chromium, myintervention)
+  )
+
+# note the different ranges of the observed and "post-intervention" exposures
+range(df$arsenic)
+range(df_intervention$arsenic)
+
+# 6.	What's a technical issue with the proportional reduction approach in which exposures for all individuals are reduced by a constant proportion (Hints: think in terms of causal or modeling assumptions, and consider the post-intervention exposures for the participant with the lowest exposures)?
+
+
+# Solution to the technical issue: a "bounded" reduction that respects the observed bounds of the exposure distribution
+## bounded percent reductions: reduce participant exposures by a maximum of (prop*100)%
+## or the proportion necessary to not go below the minimum observed value
+percent_reduction_bounded <- function(x, prop) {
+  lowerbound <- min(x)
+  xint <- x * (1 - prop)
+  ifelse(xint < lowerbound, lowerbound, xint)
+}
+## example: reduction of values does not go below minimum observed
+percent_reduction_bounded(c(25, 30, 60, 75), .50)
+
+# Application: 50% BOUNDED proportioanal reduction intervention for all exposures
+myintervention <- 0.50
+df_intervention <- df %>%
+  mutate(
+    arsenic = percent_reduction_bounded(arsenic, myintervention),
+    selenium = percent_reduction_bounded(selenium, myintervention),
+    barium = percent_reduction_bounded(barium, myintervention),
+    uranium = percent_reduction_bounded(uranium, myintervention),
+    chromium = percent_reduction_bounded(chromium, myintervention)
+  )
+
+# notice minimum value of intervention now matches observed
+range(df$arsenic)
+range(df_intervention$arsenic)
+
+# New prediction based on intervention
+df_intervention$pred_biomarker <- predict(mod_biomarker, newdata = df_intervention)
+
+## Prediction using OBSERVED exposures
+df_observed <- df
+df_observed$obs_biomarker <- predict(mod_biomarker, newdata = df_observed)
+df_intervention <- left_join(df_intervention, select(df_observed, participant_id, obs_biomarker), by = join_by(participant_id))
+
+## Comparison: observed vs predicted biomarker - Overall
+df_intervention %>%
+  summarise(
+    observed = mean(obs_biomarker),
+    predicted = mean(pred_biomarker),
+    ## Effect measure: estimated percent change in biomarker
+    pct_change = ((predicted - observed) / observed) * 100
+  ) %>%
+  round(2)
+
+
+# Question regarding the bounded proportional reduction:: Which end of the exposure distribution is likely to benefit the most from this type of hypothetical proportional reduction? (i.e. does the intervention potentially benefit those most highly exposed or those who are least exposed?)
+
+# Question: Modify the code to re-do our bounded hypothetical intervention, but this time reduce the exposures by 75%. What is the predicted biomarker level under the exposure and the expected percent change for this hypothetical intervention?
+```
+
+
+###  Example 3: Hypothetical intervention example: Capped reduction of all exposures (emulating a regulation or standard)
+```{r EXAMPLE 3 - reduction based on regulatory standards }
+## In above scenario, we applied proportional reduction that was bounded by observed minimum. However, in reality, we know that there are drinking water standards set for each contaminant. Now, instead of a simple percent reduction, we want to estimate the potential impact of reducing ALL exposures to meet their respective regulatory standard set by the EPA. This requires us to modify our intervention application. We'll be setting to the enforceable maximum contaminant level (MCL), not the desired, yet unenforceable, MCL-goal.
+
+## function - reduction to standard value IF above the standard (no change for those below)
+regulatory_reduction <- function(x, standard) {
+  ifelse(x > standard, yes = standard, no = x)
+}
+# example: reduction of values based a hypothetical regulatory standard of 30 units
+regulatory_reduction(c(25, 60, 75), standard = 30)
+
+## Apply intervention to exposures
+df_intervention <- df %>%
+  # All exposures are based on ug/L concentration in drinking water (same as intervention values below)
+  mutate(
+    arsenic = regulatory_reduction(arsenic, 10),   # arsenic MCL = 10 ug/L
+    selenium = regulatory_reduction(selenium, 50), # selenium MCL = 50 ug/L
+    barium = regulatory_reduction(barium, 2000),   # barium MCL = 2000 ug/L
+    uranium = regulatory_reduction(uranium, 30),   # uranium MCL = 30 ug/L
+    chromium = regulatory_reduction(chromium, 100) # chromium = 100 ug/L
+  ) 
+
+## Perform new prediction based on intervention
+df_intervention$pred_biomarker <- predict(mod_biomarker, newdata = df_intervention)
+
+## Prediction using OBSERVED exposures
+df_observed <- df
+df_observed$obs_biomarker <- predict(mod_biomarker, newdata = df_observed)
+df_intervention <- left_join(df_intervention, select(df_observed, participant_id, obs_biomarker), by = join_by(participant_id))
+
+## compare observed vs predicted biomarker - Overall
+df_intervention %>%
+  summarise(
+    observed = mean(obs_biomarker),
+    predicted = mean(pred_biomarker),
+    # Effect measure:  estimated percent change in biomarker
+    pct_change = ((predicted - observed) / observed) * 100
+  ) %>%
+  round(2)
+
+## Question: Was this intervention less or more impactful than what we did above using proportional reductions? What's a potential explanation?
+df %>%
+  filter(arsenic > 10) %>%
+  nrow()
+df %>%
+  filter(selenium > 50) %>%
+  nrow()
+df %>%
+  filter(barium > 2000) %>%
+  nrow()
+df %>%
+  filter(uranium > 30) %>%
+  nrow()
+df %>%
+  filter(chromium > 100) %>%
+  nrow()
+
+# Question: This intervention sets observations EXACTLY to the MCL if they're above. How could this be updated to be a better representation of realistic outcomes/changes?
+```
+
+### Example 4: Hypothetical intervention example: Targeted reduction for exposure equity
+```{r EXAMPLE 4 - reduction based on health equity}
+# In the USA, we know that people living in rural locations often have higher exposure to contaminants in their drinking water than those living in urban areas. This is based on a number of structural factors, but represents a potential factor influencing health disparities. Here, we want to expand on our prior scenarios by applying hypothetical interventions that result in people from rural areas having reductions in exposures so that they're approximately equal to average exposures among people living in urban areas.
+
+## Are average exposure levels different between groups? (here we'll use geometric mean)
+# geometric mean - exponentiated mean of log-transformed distribution
+geom_mean <- function(x) {
+  exp(mean(log(x)))
+} 
+df %>%
+  group_by(rural_urban_code) %>%
+  summarise(
+    as = geom_mean(arsenic) %>% round(2),
+    se = geom_mean(selenium) %>% round(2),
+    ba = geom_mean(barium) %>% round(2),
+    u = geom_mean(uranium) %>% round(2),
+    chromium = geom_mean(chromium) %>% round(2)
+  )
+
+# Yes, we can see the average level among the rural areas is higher than among urban areas for all exposures
+
+## We need to apply a proportional reduction that results in the average exposures among rural to equal those among urban
+# Step 1: Calculate means for each group
+table.urban <- df %>%
+  filter(rural_urban_code == "Urban") %>%
+  summarise(
+    arsenic = geom_mean(arsenic),
+    selenium = geom_mean(selenium),
+    barium = geom_mean(barium),
+    uranium = geom_mean(uranium),
+    chromium = geom_mean(chromium)
+  ) %>%
+  as.data.frame() %>%
+  t()
+colnames(table.urban) <- "Urban"
+
+table.rural <- df %>%
+  filter(rural_urban_code == "Rural") %>%
+  summarise(
+    arsenic = geom_mean(arsenic),
+    selenium = geom_mean(selenium),
+    barium = geom_mean(barium),
+    uranium = geom_mean(uranium),
+    chromium = geom_mean(chromium)
+  ) %>%
+  as.data.frame() %>%
+  t()
+colnames(table.rural) <- "Rural"
+
+# Step 2: Calculate percent reduction required to make overall means equal
+table.avgs <- cbind(table.urban, table.rural) %>%
+  as.data.frame() %>%
+  mutate(pct.int = (Urban / Rural)) %>%
+  rownames_to_column(var = "exposure")
+table.avgs
+rm(table.urban, table.rural)
+
+# Step 3: Apply percent reductions to intervention data
+percent_reduction_bounded_group <- function(x, myexposure) {
+  lowerbound <- min(x)
+  intvalue <- table.avgs %>%
+    filter(exposure == myexposure) %>%
+    select(pct.int) %>%
+    as.numeric()
+  xint <- x * intvalue
+  xint <- ifelse(xint < lowerbound, lowerbound, xint)
+  return(xint)
+}
+# First apply reduction to intervention group
+df_intervention <- subset(df, subset = rural_urban_code == "Rural") %>%
+  mutate(
+    arsenic = percent_reduction_bounded_group(arsenic, "arsenic"),
+    selenium = percent_reduction_bounded_group(selenium, "selenium"),
+    barium = percent_reduction_bounded_group(barium, "barium"),
+    uranium = percent_reduction_bounded_group(uranium, "uranium"),
+    chromium = percent_reduction_bounded_group(chromium, "chromium")
+  )
+# can double check the first few values:
+# head(df_intervention)
+# head(subset(df, subset = rural_urban_code=='Rural'))
+
+# Next append referent group to intervention group
+df_intervention <- rbind(df_intervention, subset(df, subset = rural_urban_code == "Urban"))
+
+## Examine impact of intervention on exposure levels
+# observed
+df %>%
+  group_by(rural_urban_code) %>%
+  summarise(
+    arsenic = geom_mean(arsenic) %>% round(2),
+    selenium = geom_mean(selenium) %>% round(2),
+    barium = geom_mean(barium) %>% round(2),
+    uranium = geom_mean(uranium) %>% round(2),
+    chromium = geom_mean(chromium) %>% round(2)
+  )
+# intervention
+df_intervention %>%
+  group_by(rural_urban_code) %>%
+  summarise(
+    arsenic = geom_mean(arsenic) %>% round(2),
+    selenium = geom_mean(selenium) %>% round(2),
+    barium = geom_mean(barium) %>% round(2),
+    uranium = geom_mean(uranium) %>% round(2),
+    chromium = geom_mean(chromium) %>% round(2)
+  )
+## Question: After applying the hypothetical intervention (a bounded proportional reduction in exposures): are the geometric mean levels now roughly equal between groups? Why aren't they exactly equal?
+
+
+# Visually check (one option is box and whisker - other could be ridgeline plots)
+myboxplot <- function(myexposure) {
+  ## Create common x-axis range
+  myrange <- range(log(df[[myexposure]]))
+
+  ## Box and whisker
+  pbase <- ggplot(df, aes(x = log(get(myexposure)), y = rural_urban_code, fill = rural_urban_code)) +
+    theme(axis.title.y = element_blank()) +
+    scale_x_continuous(breaks = seq(floor(myrange[1]), ceiling(myrange[2]), by = 1), limits = c(floor(myrange[1]) - .01, ceiling(myrange[2]) + .01))
+
+  p.observed <- pbase +
+    geom_boxplot(data = df, show.legend = F) +
+    xlab(paste0("Observed - log(", myexposure, ")"))
+
+  p.intervention <- pbase +
+    geom_boxplot(data = df_intervention, show.legend = F) +
+    xlab(paste0("Intervention - log(", myexposure, ")"))
+
+  plotout <- ggarrange(p.observed, p.intervention, nrow = 2)
+  plotout
+}
+# examples
+myboxplot("arsenic")
+myboxplot("uranium")
+
+## Estimate impact of equity-based intervention on biomarker
+# Prediction using hypothetical exposures (note these are simply the observed values for the Urban group)
+df_intervention$pred_biomarker <- predict(mod_biomarker, newdata = df_intervention)
+# Prediction using OBSERVED exposures
+# df_observed <- rbind(subset(df, subset = rural_urban_code=='Rural'), subset(df, subset = rural_urban_code=='Urban'))
+df_observed <- df
+# programming note: obs_biomarker and pred_biomarker are predicted potential outcomes on the individual level and the participant_id needs to be maintained
+df_observed$obs_biomarker <- predict(mod_biomarker, newdata = df_observed)
+df_intervention <- left_join(df_intervention, select(df_observed, participant_id, obs_biomarker), by = join_by(participant_id))
+
+## compare observed vs predicted biomarker - Overall
+df_intervention %>%
+  summarise(
+    observed = round(mean(obs_biomarker), 2),
+    predicted = round(mean(pred_biomarker), 2),
+    #  Effect measure: percent change in biomarker
+    pct_change = round(((predicted - observed) / observed) * 100, 2)
+  ) %>%
+  as.data.frame()
+
+## Compare observed vs predicted by group
+df_intervention %>%
+  group_by(rural_urban_code) %>%
+  summarise(
+    observed = round(mean(obs_biomarker), 2),
+    predicted = round(mean(pred_biomarker), 2),
+    pct_change = round(((predicted - observed) / observed) * 100, 2)
+  ) %>%
+  as.data.frame()
+
+## Question: What are your take-aways from the equity approach? What factors might we use in the future to better inform the potential impact of real-world interventions to reduce exposure inequities?
+```
+
+### Example 5:  Bootstrapping to calculate confidence intervals for parametric g-formula estimates
+```{r EXAMPLE 5 - calculate CIs from intervention effect}
+# Here, we are going to redo the hypothetical intervention based on proportional reductions in exposures (Example 2 above). Except now, we will extend the approach to calculate the confidence interval for our estimate. This approach differs from the calculation of a confidence interval from a standard regression model, as it requires us to repeatedly sample our data to get a distribution of values (think more Bayesian rather than typical frequentist methods).
+
+# Definition: a "bootstrap sample" is a sample of the analysis units (here, individuals) with replacement from the analytic dataset
+# Definition: "bootstrap distribution" is a term for a distribtution of a statistic that is calculated over repeated bootstrap samples.
+# Definition: "sampling distribution" is a term for the distribution of a statistic we expect over infinite repititions of a study.
+
+# Bootstrapping is a general way to estimate the "sampling distribution" of statistics and are especially useful if we do not have other ways to estimate the sampling distribution.
+# For example, the standard deviation of the bootstrap distribution of a regression slope will be very close to the standard error, so that we can use bootstrapping-based or model-based standard errors to calculate confidence intervals. G-computation will not generally have "model-based" standard errors, so we use bootstrapping.
+
+# The simplest way to do this is to wrap all of the g-computation steps into a single function that can be run repeatedly
+
+# In R, we can implement bootstrapping by wrapping all of the steps of getting an estimate into a function, and then running that function over repeated bootstrap samples of the population
+
+# Implementation of the bootstrap for g-computation (bounded percent reduction, same scenario as Example 3): 
+
+## Create function to fit model (same model as used in example above, but allows model to be fit to bootstrap sample of participants [data = bootdf])
+gcomp_fit_model <- function(bootdf) {
+  bootmod_biomarker <- glm(biomarker ~ log(arsenic) + log(selenium) + log(barium) + log(uranium) + log(chromium) + value_index * rural_urban_code, data = bootdf)
+  bootmod_biomarker
+}
+
+## Function to implement the hypothetical intervetion (repeated from above)
+percent_reduction_bounded <- function(x, pct) {
+  lowerbound <- min(x)
+  xint <- x * (1 - pct)
+  ifelse(xint < lowerbound, lowerbound, xint)
+}
+
+# Re-apply intervention using bounded approach (now as a function)
+gcomp_reduce_exposures <- function(bootdf, myintervention = 0.50) {
+  bootdf_intervention <- bootdf %>%
+    mutate(
+      arsenic = percent_reduction_bounded(arsenic, myintervention),
+      selenium = percent_reduction_bounded(selenium, myintervention),
+      barium = percent_reduction_bounded(barium, myintervention),
+      uranium = percent_reduction_bounded(uranium, myintervention),
+      chromium = percent_reduction_bounded(chromium, myintervention)
+    )
+  bootdf_intervention
+}
+
+## Apply predictions and get effect measures (now as a function)
+gcomp_get_predictions <- function(bootdf, bootdf_intervention, bootmodel) {
+  # intervention
+  bootdf_intervention$pred_biomarker <- predict(bootmodel, newdata = bootdf_intervention)
+  # observed
+  bootdf$obs_biomarker <- predict(bootmodel, newdata = bootdf)
+  bootdf_observed <- bootdf
+  bootdf_observed$obs_biomarker <- predict(bootmodel, newdata = bootdf_observed)
+  bootdf_intervention <- left_join(bootdf_intervention, select(bootdf_observed, bootparticipant_id, obs_biomarker), by = join_by(bootparticipant_id))
+}
+
+## Get effect measures from predictions (now as a function)
+qgcomp_get_effectmeasures <- function(bootdf_intervention) {
+  bootdf_intervention %>%
+    summarise(
+      observed = mean(obs_biomarker),
+      predicted = mean(pred_biomarker),
+      ## here we calculate an additional effect measure: abs_change = absolute change in the outcome, sometimes called the mean difference
+      abs_change = (predicted - observed),
+      pct_change = (predicted - observed) / observed * 100
+    ) %>%
+    as.data.frame() %>%
+    select(abs_change, pct_change)
+}
+
+## We so we need a function to draw a bootstrap sample and create a new id 
+## Note: a bootstrap sample is a sample with the same number of units as the original dataset, using sampling with replacement. Thus, some individuals will be represented by multiple "copies" within a bootstrap sample, so they need new ids to distinguish the copies from one another (the id is used for merging datasets, in this case)
+qgcomp_draw_bootsample <- function(df, no_resample = FALSE) {
+  ## technical note: in repeated measures data, or data with correlation across observations, bootstrapping will be done differently!
+  if (no_resample) {
+    ## allow the sample to return the original dataset if no_resample = TRUE (comes in handy as a programming trick later)
+    df$bootparticipant_id <- 1:nrow(df)
+    return(df) 
+  }
+  bootsample_keep <- sample(1:nrow(df), replace = TRUE)
+  bootdf <- df[bootsample_keep, ]
+  bootdf$bootparticipant_id <- 1:nrow(bootdf)
+  bootdf
+}
+
+
+## Finally, we need a function to do all steps at once. This function can be run repeatedly to generate a set of many bootstrap samples. The bootstrap samples then form the "sampling distribution" of the measures/effect estimates from which we can calculate confidence intervals
+qgcomp_do_allsteps <- function(df, iter, no_resample = FALSE) {
+  ### 1) draw bootstrap sample
+  bootdf <- qgcomp_draw_bootsample(df, no_resample = no_resample) 
+  ### 2) fit model to bootstrap sample
+  bootmodel <- gcomp_fit_model(bootdf)
+  ### 3) create intervention dataset using the bootstrap dataset
+  bootdf_intervention <- gcomp_reduce_exposures(bootdf, myintervention = 0.50)
+  ### 4) generate predictions in the interventions dataset using the model fit to the bootstrap sample
+  bootdf_intervention <- gcomp_get_predictions(bootdf, bootdf_intervention, bootmodel)
+  ### 5) calculate effect measure on the bootstrap sample
+  cross_join(data.frame(bootiter = iter), qgcomp_get_effectmeasures(bootdf_intervention))
+}
+
+## Question: What are the five steps that you repeat to get a bootstrap distribution for effect measures from g-computation?
+
+## one sample (just to see output)
+qgcomp_do_allsteps(df, iter = 1) %>%
+  as.data.frame()
+
+# Drawing a bootstrap distribution: 1000 bootstrap samples of g-computation estimates
+## we now do the same step as above, repeatedly
+## set a seed for repeatability (usually we do not use a seed until we have ensured that there are no bugs)
+set.seed(1232)
+## first we have to store all boostrap estimates in a list
+## Note: this can take a while on a slow computer or large dataset
+bootsamples <- lapply(1:1000, function(i) {
+  qgcomp_do_allsteps(df, iter = i)
+  }
+  )
+## then we can convert that list to a data.frame for processing
+bootsamples.df <- do.call(rbind, bootsamples)[, c("abs_change", "pct_change")]
+## bootstrap standard errors are given as the standard deviations of the bootstrap iterations. We can use 1.96*bootstrap standard error to get 95% confidence intervals (so-called "Wald" style confidence intervals)
+bootse <- apply(bootsamples.df, 2, sd)
+## The "point estimate" is always based on the original data and not a bootstrap sample
+pointest <- qgcomp_do_allsteps(df, 0, no_resample = TRUE)[, c("abs_change", "pct_change")] 
+# NOTE: double check this versus the answer above using the bounded proportional reduction (they should be the same)
+boot_ci_wald <- as.data.frame(rbind(
+  "Est" = pointest,
+  "2.5%" = pointest - 1.96 * bootse,
+  "97.5%" = pointest + 1.96 * bootse
+))
+
+boot_ci_wald %>%
+  as.data.frame()
+
+# OR we can use percentiles of the bootstrap distribution to get 95% confidence intervals
+boot_ci_pctl <- as.data.frame(apply(bootsamples.df, 2, function(x) quantile(x, c(0.025, 0.975))))
+
+rbind(as.data.frame(pointest, row.names=c("Est")), boot_ci_pctl)  %>%
+  as.data.frame()
+
+
+## NOTE: Wald-style confidence intervals are preferable when
+##  a) bootstrap draws are roughly normal AND
+##  b) it is much faster to get ~200 bootstrap draws (for stable standard error estimate) versus the >1000 bootstrap samples needed to get stable percentile-based confidence intervals
+
+## we can check approximate normality with a histogram (scaled to represent a density, rather than counts)
+ggplot() +
+  theme_classic() +
+  geom_histogram(data = bootsamples.df, aes(x = pct_change, after_stat(density), color = "Bootstrap samples"), fill = "white", bins = 50) +
+  stat_function(aes(color = "Normal Density"), fun = dnorm, args = list(mean = mean(bootsamples.df$pct_change), sd = sd(bootsamples.df$pct_change)), linewidth = 1.5) +
+  scale_y_continuous(name = "Density") +
+  scale_color_discrete(name = "", type = c("red", "black")) +
+  theme(legend.position.inside = c(0, 1), legend.justification = c(0, 1))
+
+
+
+
+# Questions: Examine the point estimates in the `pointest` object
+# a) Which estimates (i.e. intervention and effect measure) are we getting estimates for in this step?
+# b) How could you interpret the effect measures (point estimates only) in a in terms of associations? 
+# c) How could you interpret the effect measures (point estimates only) in a in terms of causal effects (if all causal assumptions hold)? 
+
+# Question: Examine the histogram of the bootstrap sample for the "pct_change" effect estimate, as well as the two sets of confidence intervals.
+# a) Does this example show the intervention may have a statistically significant impact on our biomarker outcome?
+# b) Does the normality assumption seem reasonable (why/why not) ?
+# c) Does your answer to b match with what you observe from the two sets of confidence intervals?
+# d) Which set of confidence intervals would you report?
+# e) Do you think your answer to a would change if the hypothetical intervention reduced the exposures by 1%? Why or why not?
+
+# 3) Question: Which part(s) of this section of code would we change to get bootstrap estimates for the "regulation" intervention (describe only)
+
+# 4) BONUS Question: Modify the code (copy/paste below) to get 90% bootstrap confidence intervals (percentile based). What are they?
+
+# 5) BONUS Question: Modify the code (copy/paste below) to get point estimates and 95% bootstrap confidence intervals for the "regulation" intervention (use the same seed value)? What are they?
+
+# 6) BONUS Question: Modify the code (copy/paste below) to get point estimates and 95% bootstrap confidence intervals for the "regulation" intervention (use the same seed value). What are they?
+
+# 7) BONUS Question: Modify the code (copy/paste below) to get point estimates and 95% bootstrap confidence intervals for the "regulation" intervention for the binary outcome "cancer" in the data (use the same seed value and a logistic model that has the same terms as the linear model used above)
+```

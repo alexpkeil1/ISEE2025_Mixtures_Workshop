@@ -1,0 +1,256 @@
+---
+title: "ISEE 2025 Drinking Water - Appendix for data generation"
+knit: (function(inputFile, encoding) { 
+      out_dir <- '../output';
+      rmarkdown::render(inputFile,
+                        encoding=encoding,
+                        output_format="all", 
+                        output_file=file.path(dirname(inputFile), out_dir, 
+                        'Drinking-Water - Appendix-output')) 
+                        }
+                        )
+output:
+  html_document:
+    number_sections: yes
+    toc: yes
+date: "`r Sys.Date()`"
+---
+
+```{r set path name, echo=FALSE, message=FALSE, warning=FALSE}
+# Installation of packages if needed
+list_of_packages <- c("dplyr", "tidyr", "here", "rmarkdown", "knitr")
+new_packages <- list_of_packages[!(list_of_packages %in% installed.packages()[, "Package"])]
+if (length(new_packages)) {
+  install.packages(new_packages, repos = "https://mirrors.nics.utk.edu/cran")
+}
+# Note to attendee: You will need to download workshop folder and then you may need to input your own directory
+mydirectory <- normalizePath(here::here()) # this can be used to automatically set the path to the root directory
+# mydirectory <- "C:/Users/spaurms/OneDrive - National Institutes of Health/Presentations/ISEE 2025/Workshop/isee_2025_organizers/ISEE2025_Workshop"
+```
+
+# Load packages
+```{r load packages}
+library(tidyr, warn.conflicts = FALSE)
+library(dplyr, warn.conflicts = FALSE)
+```
+
+# Data prep
+```{r Data loading & cleaning}
+# Base directory (Note - if you encounter errors you must input your own information in place of "~...")
+# mydirectory <- "~.../ISEE2025_Workshop" # Replace "~..."
+# Directory names
+wd.data <- file.path(mydirectory, "data")
+wd.output <- file.path(mydirectory, "output")
+```
+
+```{r check mydirectory, echo=FALSE}
+if (!(basename(mydirectory) %in% c("ISEE2025_Workshop", "ISEE2025_Mixtures_Workshop"))) {
+  stop("Please set `mydirectory` to the local path on your computer containing workshop files (around line 12 of this file)")
+}
+```
+
+```{r pre-cleaning epa data steps}
+## Preparing EPA data: read in original file, then exclude extremely high concentrations and export
+
+# read in data
+# epa_county_data <-read_excel("Ravalli_2021_datasets_and_codebook.xlsx",sheet="CountyLevel") %>%
+#  janitor::clean_names()
+
+# select variables of interest
+# epa_county_data2 = epa_county_data %>% select(county_fips,state_code,region,as_weighted_avg20062011,ba_weighted_avg20062011,be_weighted_avg20062011,cd_weighted_avg20062011,cr_weighted_avg20062011,hg_weighted_avg20062011,se_weighted_avg20062011,u_weighted_avg20002011)
+
+# restrict to counties with data, excluding extreme outliers
+# epa_county_data3 = epa_county_data2 %>%
+#  filter(as_weighted_avg20062011 <10000) %>%
+#  filter(ba_weighted_avg20062011 <10000) %>%
+#  filter(be_weighted_avg20062011 <10000) %>%
+#  filter(cd_weighted_avg20062011  <10000) %>%
+#  filter(cr_weighted_avg20062011<10000) %>%
+#  filter(hg_weighted_avg20062011 <10000) %>%
+#  filter(se_weighted_avg20062011 <10000) %>%
+#  filter(u_weighted_avg20002011<10000)
+
+# file <- paste0(folder.output, "/Ravalli_2021_adapted_ISEE_2025_county.csv" )
+# write.csv(epa_county_data3, file = file )
+```
+
+
+```{r load epa and census data}
+## Set data directory
+setwd(wd.data)
+
+### EPA Data
+# source: https://msph.shinyapps.io/drinking-water-dashboard/ Ravalli et al. 2022 (DOI: 10.1016/S2542-5196(22)00043-2)
+epa_county_data <- read.csv("Ravalli_2021_adapted_ISEE_2025_county.csv") %>%
+  janitor::clean_names() %>%
+  mutate(
+    county_fips = as.factor(county_fips),
+    region = as.factor(region)
+  )
+
+dim(epa_county_data) # 1152
+
+### Cancer Census Data
+# source: https://statecancerprofiles.cancer.gov/map/map.withimage.php?00&county&001&03010&00&0&3&0&1&5&0#results
+census_data <- readxl::read_xlsx("census.xlsx") %>%
+  janitor::clean_names() %>%
+  rename(
+    "county_fips" = "fips",
+    "rural_urban_code" = "x2023_rural_urban_continuum_codes_rural_urban_note"
+  ) %>%
+  mutate(
+    county_fips = as.factor(county_fips),
+    rural_urban_code = as.factor(rural_urban_code)
+  )
+dim(census_data) # 3133
+
+### Merge
+epa_census_data <- merge(epa_county_data, census_data, by = "county_fips")
+
+### Inspect
+dim(epa_census_data) # obs = 1058; vars = 14
+head(epa_census_data, 2)
+summary(epa_census_data)
+summary(epa_census_data$value_index)
+
+### Working data
+# Note to attendees: exposures represent weighted average of water contaminants from 2006-2011
+names(epa_census_data)
+df <- epa_census_data %>%
+  # simplify contaminant naming
+  rename(
+    arsenic = as_weighted_avg20062011,
+    barium = ba_weighted_avg20062011,
+    beryllium = be_weighted_avg20062011,
+    cadmium = cd_weighted_avg20062011,
+    chromium = cr_weighted_avg20062011,
+    mercury = hg_weighted_avg20062011,
+    selenium = se_weighted_avg20062011,
+    uranium = u_weighted_avg20002011
+  )
+
+### List of exposure columns
+exposures <- c(
+  "arsenic",
+  "barium",
+  "beryllium",
+  "cadmium",
+  "chromium",
+  "mercury",
+  "selenium",
+  "uranium"
+)
+
+### Cleaning of covariates
+levels(df$rural_urban_code) # change to have "Urban" be referent level
+df <- df %>% mutate(rural_urban_code = factor(rural_urban_code, levels = c("Urban", "Rural")))
+
+
+### Remove unneeded datasets
+rm(census_data, epa_county_data, epa_census_data)
+```
+
+```{r cleaning - exposures}
+## Examine exposure distributions for outliers
+# outlier = z-score >abs(5)
+for (i in 1:length(exposures)) {
+  # z-scores = (measure - mean)/sd
+  mysd <- sd(df[[exposures[i]]])
+  mymean <- mean(df[[exposures[i]]])
+  df[[paste0(exposures[i], "_z")]] <- (df[[exposures[i]]] - mymean) / mysd
+
+  # z-score vs observed value
+  myplot <- with(df, plot(get(paste0(exposures[i], "_z")), get(exposures[i]),
+    xlab = paste0(exposures[i], "_z"), ylab = exposures[i]
+  ))
+  abline(v = 5, lty = 2, col = "red") # possible z-score cutoff
+
+  # show
+  print(exposures[i])
+  print(summary(df[[exposures[i]]])) # observed values
+  print(myplot) # z-score vs observed
+
+  rm(mysd, mymean, myplot, i)
+}
+# remove z-score versions
+df <- df %>% select(-all_of(paste0(exposures, "_z")))
+df <- df %>%
+  mutate(participant_id = 1:nrow(df)) %>%
+  select(participant_id, everything())
+```
+
+```{r simulate outcomes}
+## Description: Here we are simulating outcomes in our analytic dataset. The relationship between the simulated outcomes and measured (observed) exposures can be altered by: 1) changing the input coefficients and 2) changing the model. The current form is provided as a starting point that could be altered for other examples.
+
+### Create temporary data to run simulations
+set.seed(123)
+df_sim <- df # new copy for simulated cancer outcomes
+
+### predict a continuous outcome (e.g., pre-clinical cancer biomarker concentration [ug/dl] in serum)
+outcome_function_continuous <- function(data, coefs, err_sd, model, ...) {
+  # function to calculate mean outcome under a given intervention
+  require("dplyr")
+  X <- model.matrix(model, data = data)
+  ypred <- X %*% coefs + 100
+  yerr <- rnorm(length(ypred), 0, sd = err_sd)
+  # New variable is "biomarker"
+  data %>% mutate(biomarker = ypred + yerr)
+}
+## "True" causal relationship for simulated continuous outcome - cancer biomarker
+df_sim <- outcome_function_continuous(
+  data = df_sim,
+  coefs = c(
+    0.0, # coef 1 = intercept
+    0.9, # coef 2 = arsenic
+    1.5, # coef 3 = uranium
+    0.2, # coef 4 = selenium
+    0.5, # coef 5 = value_index - Social vulnerability index. higher = more vulnerable
+    -2, # coef 6 = rural_urban_code (Urban)
+    0.2 # coef 7 = arsenic*uranium # coef 8 = arsenic*uranium
+  ),
+  err_sd = 5.0,
+  model = ~ arsenic + uranium + arsenic * uranium + selenium + value_index + rural_urban_code
+)
+
+### predict a binary outcome
+outcome_function_binary <- function(data, coefs, model, ...) {
+  # function to calculate binary outcome under a given intervention
+  require("dplyr")
+  # if only 'ymodel' and 'data' are supplied, then natural course is fit
+  X <- model.matrix(model, data = data)
+  model.matrix(model.frame(model, data = data), data = data)
+  ypred <- X %*% coefs
+  ybin <- rbinom(length(ypred), 1, plogis(ypred))
+  data %>% mutate(cancer = ybin)
+}
+## "True" causal relationship for simulated binary outcome - cancer (1 = cancer, 0 = non-cancer)
+df_sim <- outcome_function_binary(
+  data = df_sim,
+  coefs = c(
+    -5.0, # coef 1 = intercept
+    0.9, # coef 2 = arsenic
+    1.5, # coef 3 = uranium
+    0.2, # coef 4 = selenium
+    0.5, # coef 5 = value_index - Social vulnerability index. higher = more vulnerable
+    -2, # coef 6 = rural_urban_code (Urban)
+    0.2 # coef 7 = arsenic*uranium
+  ),
+  model = ~ arsenic + uranium + arsenic * uranium + selenium + value_index + rural_urban_code
+)
+
+### Examine outcomes
+summary(df_sim$biomarker) # continuous
+table(df_sim$cancer) # binary
+df_sim %>%
+  group_by(cancer) %>%
+  summarise(mean = mean(biomarker)) # shows biomarker is higher among those with cancer
+
+## Replace df with df_sim
+df <- df_sim
+rm(df_sim)
+```
+
+```{r save working data}
+setwd(wd.data)
+saveRDS(df, "Drinking Water data.RDS")
+```
