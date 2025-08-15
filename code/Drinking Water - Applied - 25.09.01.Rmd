@@ -606,7 +606,6 @@ gcomp_get_predictions <- function(bootdf, bootdf_intervention, bootmodel) {
   # intervention
   bootdf_intervention$pred_biomarker <- predict(bootmodel, newdata = bootdf_intervention)
   # observed
-  bootdf$obs_biomarker <- predict(bootmodel, newdata = bootdf)
   bootdf_observed <- bootdf
   bootdf_observed$obs_biomarker <- predict(bootmodel, newdata = bootdf_observed)
   bootdf_intervention <- left_join(bootdf_intervention, select(bootdf_observed, bootparticipant_id, obs_biomarker), by = join_by(bootparticipant_id))
