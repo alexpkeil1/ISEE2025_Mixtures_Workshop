@@ -263,7 +263,7 @@ percent_reduction <- function(x, prop) {
 ## example usage: 75% reduction of 100
 percent_reduction(x = 100, prop = .75)
 
-# Application: 50% proportioanal reduction intervention for all exposures
+# Application: 50% proportional reduction intervention for all exposures
 myintervention <- 0.50
 df_intervention <- df %>%
   mutate(
@@ -278,7 +278,7 @@ df_intervention <- df %>%
 range(df$arsenic)
 range(df_intervention$arsenic)
 
-# QUESTION:	What's a technical issue with the proportional reduction approach in which exposures for all individuals are reduced by a constant proportion (Hints: think in terms of causal or modeling assumptions, and consider the post-intervention exposures for the participant with the lowest exposures)?
+# Question:	What's a technical issue with the proportional reduction approach in which exposures for all individuals are reduced by a constant proportion (Hints: think in terms of causal or modeling assumptions, and consider the post-intervention exposures for the participant with the lowest exposures)?
 
 
 # Solution to the technical issue: a "bounded" reduction that respects the observed bounds of the exposure distribution
@@ -373,28 +373,14 @@ df_intervention %>%
   round(2)
 
 ## Question: Was this intervention less or more impactful than what we did above using proportional reductions? What's a potential explanation?
-df %>%
-  filter(arsenic > 10) %>%
-  nrow()
-df %>%
-  filter(selenium > 50) %>%
-  nrow()
-df %>%
-  filter(barium > 2000) %>%
-  nrow()
-df %>%
-  filter(uranium > 30) %>%
-  nrow()
-df %>%
-  filter(chromium > 100) %>%
-  nrow()
+## Hint: think about regulatory limit values we used above for individual exposures.
 
 # Question: This intervention sets observations EXACTLY to the MCL if they're above. How could this be updated to be a better representation of realistic outcomes/changes?
 ```
 
 ### Example 4: Hypothetical intervention example: Targeted reduction for exposure equity
 ```{r EXAMPLE 4 - reduction based on health equity}
-# In the USA, we know that people living in rural locations often have higher exposure to contaminants in their drinking water than those living in urban areas. This is based on a number of structural factors, but represents a potential factor influencing health disparities. Here, we want to expand on our prior scenarios by applying hypothetical interventions that result in people from rural areas having reductions in exposures so that they're approximately equal to average exposures among people living in urban areas.
+# In the USA, we know that people living in rural locations often have higher exposure to contaminants in their drinking water than those living in urban areas. This is based on a number of structural factors, but represents a potential driver of health disparities. Here, we want to expand on our prior scenarios by applying hypothetical interventions that result in people from rural areas having reductions in exposures so that they're approximately equal to average exposures among people living in urban areas.
 
 ## Are average exposure levels different between groups? (here we'll use geometric mean)
 # geometric mean - exponentiated mean of log-transformed distribution
@@ -410,8 +396,7 @@ df %>%
     u = geom_mean(uranium) %>% round(2),
     chromium = geom_mean(chromium) %>% round(2)
   )
-
-# Yes, we can see the average level among the rural areas is higher than among urban areas for all exposures
+# Short answer: Yes, code above shows us that the average level among the rural areas is higher than among urban areas for all exposures
 
 ## We need to apply a proportional reduction that results in the average exposures among rural to equal those among urban
 # Step 1: Calculate means for each group
@@ -562,7 +547,7 @@ df_intervention %>%
 ```{r EXAMPLE 5 - calculate CIs from intervention effect}
 # Here, we are going to redo the hypothetical intervention based on proportional reductions in exposures (Example 2 above). Except now, we will extend the approach to calculate the confidence interval for our estimate. This approach differs from the calculation of a confidence interval from a standard regression model, as it requires us to repeatedly sample our data to get a distribution of values (think more Bayesian rather than typical frequentist methods).
 
-# Definition: a "bootstrap sample" is a sample of the analysis units (here, individuals) with replacement from the analytic dataset
+# Definition: a "bootstrap sample" is a sample of the analysis units (here, individual rows) with replacement from the analytic dataset
 # Definition: "bootstrap distribution" is a term for a distribtution of a statistic that is calculated over repeated bootstrap samples.
 # Definition: "sampling distribution" is a term for the distribution of a statistic we expect over infinite repititions of a study.
 
@@ -705,10 +690,9 @@ ggplot() +
   scale_y_continuous(name = "Density") +
   scale_color_discrete(name = "", type = c("red", "black")) +
   theme(legend.position.inside = c(0, 1), legend.justification = c(0, 1))
+```
 
-
-
-
+```{r EXAMPLE 5 - follow-up questions}
 # Questions: Examine the point estimates in the `pointest` object
 # a) Which estimates (i.e. intervention and effect measure) are we getting estimates for in this step?
 # b) How could you interpret the effect measures (point estimates only) in a in terms of associations?
