@@ -597,7 +597,7 @@ gcomp_get_predictions <- function(bootdf, bootdf_intervention, bootmodel) {
 }
 
 ## Get effect measures from predictions (now as a function)
-qgcomp_get_effectmeasures <- function(bootdf_intervention) {
+gcomp_get_effectmeasures <- function(bootdf_intervention) {
   bootdf_intervention %>%
     summarise(
       observed = mean(obs_biomarker),
@@ -612,7 +612,7 @@ qgcomp_get_effectmeasures <- function(bootdf_intervention) {
 
 ## We so we need a function to draw a bootstrap sample and create a new id
 ## Note: a bootstrap sample is a sample with the same number of units as the original dataset, using sampling with replacement. Thus, some individuals will be represented by multiple "copies" within a bootstrap sample, so they need new ids to distinguish the copies from one another (the id is used for merging datasets, in this case)
-qgcomp_draw_bootsample <- function(df, no_resample = FALSE) {
+gcomp_draw_bootsample <- function(df, no_resample = FALSE) {
   ## technical note: in repeated measures data, or data with correlation across observations, bootstrapping will be done differently!
   if (no_resample) {
     ## allow the sample to return the original dataset if no_resample = TRUE (comes in handy as a programming trick later)
@@ -627,9 +627,9 @@ qgcomp_draw_bootsample <- function(df, no_resample = FALSE) {
 
 
 ## Finally, we need a function to do all steps at once. This function can be run repeatedly to generate a set of many bootstrap samples. The bootstrap samples then form the "sampling distribution" of the measures/effect estimates from which we can calculate confidence intervals
-qgcomp_do_allsteps <- function(df, iter, no_resample = FALSE) {
+gcomp_do_allsteps <- function(df, iter, no_resample = FALSE) {
   ### 1) draw bootstrap sample
-  bootdf <- qgcomp_draw_bootsample(df, no_resample = no_resample)
+  bootdf <- gcomp_draw_bootsample(df, no_resample = no_resample)
   ### 2) fit model to bootstrap sample
   bootmodel <- gcomp_fit_model(bootdf)
   ### 3) create intervention dataset using the bootstrap dataset
@@ -637,13 +637,13 @@ qgcomp_do_allsteps <- function(df, iter, no_resample = FALSE) {
   ### 4) generate predictions in the interventions dataset using the model fit to the bootstrap sample
   bootdf_intervention <- gcomp_get_predictions(bootdf, bootdf_intervention, bootmodel)
   ### 5) calculate effect measure on the bootstrap sample
-  cross_join(data.frame(bootiter = iter), qgcomp_get_effectmeasures(bootdf_intervention))
+  cross_join(data.frame(bootiter = iter), gcomp_get_effectmeasures(bootdf_intervention))
 }
 
 ## Question: What are the five steps that you repeat to get a bootstrap distribution for effect measures from g-computation?
 
 ## one sample (just to see output)
-qgcomp_do_allsteps(df, iter = 1) %>%
+gcomp_do_allsteps(df, iter = 1) %>%
   as.data.frame()
 
 # Drawing a bootstrap distribution: 1000 bootstrap samples of g-computation estimates
@@ -653,14 +653,14 @@ set.seed(1232)
 ## first we have to store all boostrap estimates in a list
 ## Note: this can take a while on a slow computer or large dataset
 bootsamples <- lapply(1:1000, function(i) {
-  qgcomp_do_allsteps(df, iter = i)
+  gcomp_do_allsteps(df, iter = i)
 })
 ## then we can convert that list to a data.frame for processing
 bootsamples.df <- do.call(rbind, bootsamples)[, c("abs_change", "pct_change")]
 ## bootstrap standard errors are given as the standard deviations of the bootstrap iterations. We can use 1.96*bootstrap standard error to get 95% confidence intervals (so-called "Wald" style confidence intervals)
 bootse <- apply(bootsamples.df, 2, sd)
 ## The "point estimate" is always based on the original data and not a bootstrap sample
-pointest <- qgcomp_do_allsteps(df, 0, no_resample = TRUE)[, c("abs_change", "pct_change")]
+pointest <- gcomp_do_allsteps(df, 0, no_resample = TRUE)[, c("abs_change", "pct_change")]
 # NOTE: double check this versus the answer above using the bounded proportional reduction (they should be the same)
 boot_ci_wald <- as.data.frame(rbind(
   "Est" = pointest,
