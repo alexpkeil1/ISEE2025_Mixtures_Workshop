@@ -3,7 +3,7 @@ Code, data, and other materials for the ISEE/ISES 2025 pre-conference workshop:
 
 ## Hypothetical interventions for exposure mixtures: Practical theory and applications for epidemiologists
 
-### Files/directories: (slides and answer keys will be sent to participants separately)
+### Files/directories: (answer keys will be sent to participants separately)
 ```
 ├── code     (2 .Rmd files, you need the "Applied" file)
 ├── data     (3 files, you can ignore)
