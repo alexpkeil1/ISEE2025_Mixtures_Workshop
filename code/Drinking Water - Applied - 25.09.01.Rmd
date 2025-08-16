@@ -172,7 +172,7 @@ pheatmap::pheatmap(df.cor,
 ## Question: What are any take-away observations you have from the correlation plots? How could these correlations influence your approach to a) specifying an exposure mixture (i.e. distinguish between "exposures that are measured together" and "mixture") and b) examining the joint effects of changes in the exposure mixture on outcomes?
 
 
-## Question: 4.	Modify the code to examine which group is exposed to higher mean levels of arsenic, selenium, barium, uranium, chromium across levels of `rural_urban_code`. Which group is most highly exposed to each? Do you feel that, overall, exposure to the mixture of these contaminants is equitable across levels of rural_urban?
+## Question: Modify the code to examine which group is exposed to higher mean levels of arsenic, selenium, barium, uranium, chromium across levels of `rural_urban_code`. Which group is most highly exposed to each? Do you feel that, overall, exposure to the mixture of these contaminants is equitable across levels of rural_urban?
 ```
 
 # G-computation (parametric g-formula) to estimate effects of hypothetical interventions on a mixture of time-fixed, continuous exposures on a continuous outcome
