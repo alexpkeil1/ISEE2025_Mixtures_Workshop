@@ -8,7 +8,8 @@ Code, data, and other materials for the ISEE/ISES 2025 pre-conference workshop:
 ├── code     (2 .Rmd files, you need the "Applied" file)
 ├── data     (3 files, you can ignore)
 ├── output   (2 .html files, you need the "Applied" file)
-├── readings (2 .pdf files, you both)
+├── readings (2 .pdf files, you need both)
+├── Slides for Attendees (4 .pdf files, you need all)
 └── ISEE Workshop worksheet.docx (you need this)
 
 ```
